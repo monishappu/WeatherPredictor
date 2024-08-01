@@ -1,224 +1,185 @@
-# WeatherPredictor
+# Global Weather Forecasting Project
 
 ## Overview
 
-**WeatherPredictor** is a comprehensive time series analysis project aimed at forecasting future temperatures based on historical data. Utilizing advanced statistical models such as SARIMA, this project provides insights and predictions for temperature trends across various global cities.
+This project involves forecasting future temperatures based on past global daily temperature data. The dataset is processed, analyzed, and modeled using statistical methods to predict future temperatures. Two models are explored: ARIMA and SARIMA.
 
-## Features
+## Table of Contents
 
-- **Data Preprocessing:** Efficient handling of missing values, and converting date columns to appropriate datetime format.
-- **Exploratory Data Analysis (EDA):** Visualization of temperature trends over time for different countries.
-- **Stationarity Testing:** Using the Augmented Dickey-Fuller (ADF) test to check the stationarity of the time series data.
-- **ARIMA and SARIMA Modeling:** Applying ARIMA and Seasonal ARIMA models to forecast future temperatures.
-- **Evaluation Metrics:** Calculating Mean Squared Error (MSE) to evaluate model performance.
-- **Future Forecasting:** Predicting future temperature trends for a specified period.
+1. [Data Collection](#1-data-collection)
+2. [Data Preprocessing](#2-data-preprocessing)
+3. [Exploratory Data Analysis (EDA)](#3-exploratory-data-analysis-eda)
+4. [Check and Make Data Stationary](#4-check-and-make-data-stationary)
+5. [Split the Data into Training and Testing Sets](#5-split-the-data-into-training-and-testing-sets)
+6. [Build and Train the ARIMA Model](#6-build-and-train-the-arima-model)
+7. [Make Predictions and Evaluate the Model](#7-make-predictions-and-evaluate-the-model)
+8. [Forecast Future Temperatures](#8-forecast-future-temperatures)
+9. [SARIMA Model](#9-sarima-model)
+   - [Fit the SARIMA Model](#91-fit-the-sarima-model)
+   - [Make Predictions and Evaluate the Model](#92-make-predictions-and-evaluate-the-model)
+   - [Forecast Future Temperatures](#93-forecast-future-temperatures)
 
-## Project Structure
+## 1. Data Collection
 
-- `data/`: Directory containing the dataset (e.g., `GlobalWeatherRepository.csv`).
-- `notebooks/`: Jupyter notebooks for data analysis and model development.
-- `scripts/`: Python scripts for data preprocessing, modeling, and evaluation.
-- `visualizations/`: Directory for storing generated plots and graphs.
+The dataset is loaded using Pandas from a CSV file.
 
-## Getting Started
+```python
+import pandas as pd
 
-### Prerequisites
+# Load the dataset
+file_path = '/content/GlobalWeatherRepository.csv'
+data = pd.read_csv(file_path)
 
-- Python 3.7+
-- pandas
-- numpy
-- matplotlib
-- seaborn
-- statsmodels
-- scikit-learn
-
-### Installation
-
-Clone the repository and install the required dependencies:
-
-```bash
-git clone https://github.com/yourusername/WeatherPredictor.git
-cd WeatherPredictor
-pip install -r requirements.txt
+# Create DataFrame
+df = pd.DataFrame(data)
 ```
 
-### Usage
+## 2. Data Preprocessing
 
-1. **Load and Preprocess Data:**
+### Steps:
 
-   ```python
-   import pandas as pd
+1. Convert the `'last_updated'` column to datetime format.
+2. Check for and handle missing values using forward fill.
 
-   # Load the dataset
-   file_path = '/content/GlobalWeatherRepository.csv'
-   data = pd.read_csv(file_path)
+```python
+# Convert 'last_updated' column to datetime
+df['last_updated'] = pd.to_datetime(df['last_updated'])
 
-   # Display the first few rows of the dataset
-   data.head()
+# Handle missing values (example: fill with forward fill method)
+df.fillna(method='ffill', inplace=True)
+```
 
-   # Create DataFrame
-   df = pd.DataFrame(data)
+## 3. Exploratory Data Analysis (EDA)
 
-   df.info()
-   df.describe()
+### Steps:
 
-   # Convert 'last_updated' column to datetime
-   df['last_updated'] = pd.to_datetime(df['last_updated'])
+1. Plot temperature over time for a specific country (e.g., India).
+2. Visualize the distribution of temperature using Seaborn.
 
-   # Check for missing values
-   print(df.isnull().sum())
+```python
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-   # Handle missing values (example: fill with forward fill method)
-   df.fillna(method='ffill', inplace=True)
+# Plotting the temperature over time for a specific country (example: 'India')
+country = 'India'
+country_data = df[df['country'] == country]
 
-   # Verify the changes
-   df.head()
-   df.info()
-   ```
+plt.figure(figsize=(15, 6))
+plt.plot(country_data['last_updated'], country_data['temperature_celsius'], label=country)
+plt.xlabel('Date')
+plt.ylabel('temperature_celsius')
+plt.title(f'Temperature over Time for {country}')
+plt.legend()
+plt.show()
 
-2. **Exploratory Data Analysis:**
+# Distribution of temperature
+sns.histplot(df['temperature_celsius'], kde=True)
+plt.title('Temperature Distribution')
+plt.show()
+```
 
-   ```python
-   import matplotlib.pyplot as plt
-   import seaborn as sns
+## 4. Check and Make Data Stationary
 
-   # Plotting the temperature over time for a specific country (example: 'India')
-   country = 'India'
-   country_data = df[df['country'] == country]
+### Steps:
 
-   plt.figure(figsize=(15, 6))
-   plt.plot(country_data['last_updated'], country_data['temperature_celsius'], label=country)
-   plt.xlabel('Date')
-   plt.ylabel('temperature_celsius')
-   plt.title(f'Temperature over Time for {country}')
-   plt.legend()
-   plt.show()
+1. Perform the Augmented Dickey-Fuller (ADF) test to check for stationarity.
+2. Apply differencing to make the data stationary if necessary.
 
-   # Distribution of temperature
-   sns.histplot(df['temperature_celsius'], kde=True)
-   plt.title('Temperature Distribution')
-   plt.show()
-   ```
+```python
+from statsmodels.tsa.stattools import adfuller
 
-3. **Train-Test Split:**
+# Function to perform Augmented Dickey-Fuller test
+def adf_test(series):
+    result = adfuller(series)
+    print('ADF Statistic:', result[0])
+    print('p-value:', result[1])
+    print('Critical Values:', result[4])
+    if result[1] <= 0.05:
+        print("The data is stationary.")
+    else:
+        print("The data is non-stationary.")
 
-   ```python
-   from sklearn.model_selection import train_test_split
+# Perform ADF test on the original data
+adf_test(df['temperature_celsius'])
 
-   # Assuming we are forecasting for one specific country
-   country = 'India'
-   country_data = df[df['country'] == country]
+# If the data is non-stationary, make it stationary
+df_diff = df['temperature_celsius'].diff().dropna()
 
-   # Set the 'last_updated' column as the index
-   country_data.set_index('last_updated', inplace=True)
+# Reindex df_diff with the 'last_updated' column, excluding the first date
+df_diff.index = df['last_updated'][1:]
+```
 
-   # Split the data
-   train_size = int(len(country_data) * 0.8)
-   train_data, test_data = country_data[:train_size], country_data[train_size:]
+## 5. Split the Data into Training and Testing Sets
 
-   print(train_data.shape, test_data.shape)
-   ```
+### Steps:
 
-4. **ARIMA Modeling and Forecasting:**
+1. Select a specific country (e.g., India) and set the `'last_updated'` column as the index.
+2. Split the data into training (80%) and testing (20%) sets.
 
-   ```python
-   from statsmodels.tsa.arima.model import ARIMA
+```python
+from sklearn.model_selection import train_test_split
 
-   # Fit the model
-   model = ARIMA(train_data['temperature_celsius'], order=(5, 1, 0))
-   model_fit = model.fit()
+# Split the data
+train_size = int(len(country_data) * 0.8)
+train_data, test_data = country_data[:train_size], country_data[train_size:]
+```
 
-   # Print the model summary
-   print(model_fit.summary())
+## 6. Build and Train the ARIMA Model
 
-   # Make predictions
-   predictions = model_fit.forecast(steps=len(test_data))
+### Steps:
 
-   # Evaluate the model
-   from sklearn.metrics import mean_squared_error
+1. Fit an ARIMA model on the training data.
 
-   mse = mean_squared_error(test_data['temperature_celsius'], predictions)
-   print(f'Mean Squared Error: {mse}')
+```python
+from statsmodels.tsa.arima.model import ARIMA
 
-   # Plot the predictions
-   plt.figure(figsize=(15, 6))
-   plt.plot(train_data['temperature_celsius'], label='Training Data')
-   plt.plot(test_data['temperature_celsius'], label='Test Data')
-   plt.plot(test_data.index, predictions, label='Predictions', color='red')
-   plt.xlabel('Date')
-   plt.ylabel('temperature_celsius')
-   plt.title(f'Temperature Predictions for {country}')
-   plt.legend()
-   plt.show()
+# Fit the model
+model = ARIMA(train_data['temperature_celsius'], order=(5, 1, 0))
+model_fit = model.fit()
+```
 
-   # Forecast future temperatures
-   future_steps = 30  # Example: Forecasting for the next 30 days
-   future_forecast = model_fit.forecast(steps=future_steps)
+## 7. Make Predictions and Evaluate the Model
 
-   # Plot the future forecast
-   plt.figure(figsize=(15, 6))
-   plt.plot(country_data['temperature_celsius'], label='Historical Data')
-   plt.plot(pd.date_range(start=country_data.index[-1], periods=future_steps, freq='D'), future_forecast, label='Future Forecast', color='green')
-   plt.xlabel('Date')
-   plt.ylabel('temperature_celsius')
-   plt.title(f'Future Temperature Forecast for {country}')
-   plt.legend()
-   plt.show()
-   ```
+### Steps:
 
-5. **SARIMA Modeling and Forecasting:**
+1. Forecast temperatures for the testing data period.
+2. Evaluate the model using Mean Squared Error (MSE).
+3. Plot the predictions against actual data.
 
-   ```python
-   from statsmodels.tsa.statespace.sarimax import SARIMAX
+```python
+from sklearn.metrics import mean_squared_error
 
-   # Fit the SARIMA model
-   sarima_model = SARIMAX(train_data['temperature_celsius'],
-                          order=(1, 1, 1),
-                          seasonal_order=(1, 1, 1, 12))
-   sarima_fit = sarima_model.fit(disp=False)
+# Make predictions
+predictions = model_fit.forecast(steps=len(test_data))
 
-   # Print the model summary
-   print(sarima_fit.summary())
+# Evaluate the model
+mse = mean_squared_error(test_data['temperature_celsius'], predictions)
+```
 
-   # Make predictions
-   sarima_predictions = sarima_fit.predict(start=test_data.index[0], end=test_data.index[-1], dynamic=False)
+## 8. Forecast Future Temperatures
 
-   # Evaluate the model
-   sarima_mse = mean_squared_error(test_data['temperature_celsius'], sarima_predictions)
-   print(f'SARIMA Mean Squared Error: {sarima_mse}')
+### Steps:
 
-   # Plot the predictions
-   plt.figure(figsize=(15, 6))
-   plt.plot(train_data['temperature_celsius'], label='Training Data')
-   plt.plot(test_data['temperature_celsius'], label='Test Data')
-   plt.plot(test_data.index, sarima_predictions, label='SARIMA Predictions', color='red')
-   plt.xlabel('Date')
-   plt.ylabel('temperature_celsius')
-   plt.title(f'Temperature Predictions for {country}')
-   plt.legend()
-   plt.show()
+1. Forecast temperatures for the next 30 days and plot the results.
 
-   # Forecast future temperatures
-   future_steps = 30  # Example: Forecasting for the next 30 days
-   sarima_forecast = sarima_fit.get_forecast(steps=future_steps)
-   sarima_forecast_index = pd.date_range(start=test_data.index[-1], periods=future_steps, freq='D')
-   sarima_forecast_values = sarima_forecast.predicted_mean
+```python
+# Forecast future temperatures
+future_steps = 30  # Example: Forecasting for the next 30 days
+future_forecast = model_fit.forecast(steps=future_steps)
+```
 
-   # Plot the future forecast
-   plt.figure(figsize=(15, 6))
-   plt.plot(country_data['temperature_celsius'], label='Historical Data')
-   plt.plot(sarima_forecast_index, sarima_forecast_values, label='SARIMA Future Forecast', color='green')
-   plt.xlabel('Date')
-   plt.ylabel('temperature_celsius')
-   plt.title(f'Future Temperature Forecast for {country}')
-   plt.legend()
-   plt.show()
-   ```
+## 9. SARIMA Model
 
-## Contributing
+### Steps:
 
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
+1. Fit a Seasonal ARIMA (SARIMA) model on the training data.
+2. Make predictions and evaluate the model using MSE.
+3. Forecast future temperatures and visualize the results.
 
-## License
+```python
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+# Fit the SARIMA model
+sarima_model = SARIMAX(train_data['temperature_celsius'], order=(1, 1, 1), seasonal_order=(1, 1, 1, 12))
+sarima_fit = sarima_model.fit(disp=False)
+```
